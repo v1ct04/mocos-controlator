@@ -159,7 +159,7 @@ public class SwipeableViewDelegate {
             if (oldValue ^ mIsDragging) {
                 mView.getParent().requestDisallowInterceptTouchEvent(true);
                 if (mListener != null)
-                    mListener.onStartTracking(e2);
+                    mListener.onStartTracking(mView, e2);
             }
             if (mIsDragging) {
                 mTranslationAnimator.cancel();
@@ -180,22 +180,22 @@ public class SwipeableViewDelegate {
                 else
                     swipeLeft(velocityX);
                 if (mListener != null)
-                    mListener.onSwipeOut();
+                    mListener.onSwipeOut(mView);
 
             } else {
                 swipeBack(velocityX);
                 if (mListener != null)
-                    mListener.onSwipeBack();
+                    mListener.onSwipeBack(mView);
             }
             return true;
         }
     }
 
     public interface OnSwipeListener {
-        void onSwipeOut();
+        void onSwipeOut(View v);
 
-        void onStartTracking(MotionEvent event);
+        void onStartTracking(View v, MotionEvent event);
 
-        void onSwipeBack();
+        void onSwipeBack(View v);
     }
 }
