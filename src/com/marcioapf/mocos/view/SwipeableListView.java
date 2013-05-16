@@ -8,7 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 
-import java.util.WeakHashMap;
+import java.util.*;
 
 public class SwipeableListView extends ListView implements SwipeableViewDelegate.OnSwipeListener {
 
@@ -16,6 +16,8 @@ public class SwipeableListView extends ListView implements SwipeableViewDelegate
             new WeakHashMap<View, SwipeableViewWrapper>();
 
     private SwipeableListListener mSwipeableListListener;
+    private ListAdapterWrapper mListAdapterWrapper;
+    private SwipeableDataSetObserver mDataSetObserver;
 
     public SwipeableListView(Context context) {
         this(context, null);
@@ -31,7 +33,13 @@ public class SwipeableListView extends ListView implements SwipeableViewDelegate
 
     @Override
     public void setAdapter(ListAdapter adapter) {
-        super.setAdapter(new ListAdapterWrapper(adapter));
+        if (mListAdapterWrapper != null) {
+            mListAdapterWrapper.mInnerAdapter.unregisterDataSetObserver(mDataSetObserver);
+        }
+        mDataSetObserver = new SwipeableDataSetObserver();
+        adapter.registerDataSetObserver(mDataSetObserver);
+        mListAdapterWrapper = new ListAdapterWrapper(adapter);
+        super.setAdapter(mListAdapterWrapper);
     }
 
     public void setSwipeableListListener(SwipeableListListener swipeableListListener) {
@@ -58,6 +66,32 @@ public class SwipeableListView extends ListView implements SwipeableViewDelegate
     public interface SwipeableListListener {
 
         void onViewSwipedOut(View view);
+    }
+
+    private class SwipeableDataSetObserver extends DataSetObserver {
+
+        private LinkedHashSet<Object> mObservedObjects;
+
+        @Override
+        public void onChanged() {
+            int size = mListAdapterWrapper.getCount();
+            LinkedHashSet<Object> newObservedObjects = new LinkedHashSet<Object>(size);
+            for (int i = 0; i < size; i++)
+                newObservedObjects.add(mListAdapterWrapper.getItem(i));
+
+            mObservedObjects = newObservedObjects;
+            mListAdapterWrapper.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onInvalidated() {
+            int size = mListAdapterWrapper.getCount();
+            mObservedObjects = new LinkedHashSet<Object>(size);
+            for (int i = 0; i < size; i++)
+                mObservedObjects.add(mListAdapterWrapper.getItem(i));
+
+            mListAdapterWrapper.notifyDataSetInvalidated();
+        }
     }
 
     private class SwipeableViewWrapper extends FrameLayout {
@@ -126,16 +160,6 @@ public class SwipeableListView extends ListView implements SwipeableViewDelegate
             }
             return new SwipeableViewWrapper(parent.getContext(),
                     mInnerAdapter.getView(position, convertView, parent));
-        }
-
-        @Override
-        public void registerDataSetObserver(DataSetObserver observer) {
-            mInnerAdapter.registerDataSetObserver(observer);
-        }
-
-        @Override
-        public void unregisterDataSetObserver(DataSetObserver observer) {
-            mInnerAdapter.unregisterDataSetObserver(observer);
         }
     }
 }
