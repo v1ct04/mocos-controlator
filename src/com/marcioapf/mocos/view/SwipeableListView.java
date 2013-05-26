@@ -12,12 +12,13 @@ import java.util.*;
 
 public class SwipeableListView extends ListView implements SwipeableViewDelegate.OnSwipeListener {
 
-    private final WeakHashMap<View, SwipeableViewWrapper> mWrapperHashMap =
-            new WeakHashMap<View, SwipeableViewWrapper>();
 
     private SwipeableListListener mSwipeableListListener;
     private ListAdapterWrapper mListAdapterWrapper;
     private SwipeableDataSetObserver mDataSetObserver;
+
+    private WeakHashMap<SwipeableViewWrapper, Integer> mWrapperHashMap =
+            new WeakHashMap<SwipeableViewWrapper, Integer>();
 
     public SwipeableListView(Context context) {
         this(context, null);
@@ -70,14 +71,21 @@ public class SwipeableListView extends ListView implements SwipeableViewDelegate
 
     private class SwipeableDataSetObserver extends DataSetObserver {
 
-        private LinkedHashSet<Object> mObservedObjects;
+        private LinkedHashMap<Integer, Object> mObservedObjects;
 
         @Override
         public void onChanged() {
             int size = mListAdapterWrapper.getCount();
-            LinkedHashSet<Object> newObservedObjects = new LinkedHashSet<Object>(size);
+            LinkedHashMap<Integer, Object> newObservedObjects = new LinkedHashMap<Integer, Object>(size);
             for (int i = 0; i < size; i++)
-                newObservedObjects.add(mListAdapterWrapper.getItem(i));
+                newObservedObjects.put(i, mListAdapterWrapper.getItem(i));
+
+            LinkedHashMap<Integer, Object> addedObjects = new LinkedHashMap<Integer, Object>(newObservedObjects);
+            addedObjects.values().removeAll(mObservedObjects.values());
+
+            // we are not going to use the old one anymore, we can mess with it
+            LinkedHashMap<Integer, Object> removedObjects = mObservedObjects;
+            removedObjects.values().removeAll(newObservedObjects.values());
 
             mObservedObjects = newObservedObjects;
             mListAdapterWrapper.notifyDataSetChanged();
@@ -86,9 +94,9 @@ public class SwipeableListView extends ListView implements SwipeableViewDelegate
         @Override
         public void onInvalidated() {
             int size = mListAdapterWrapper.getCount();
-            mObservedObjects = new LinkedHashSet<Object>(size);
+            mObservedObjects = new LinkedHashMap<Integer, Object>(size);
             for (int i = 0; i < size; i++)
-                mObservedObjects.add(mListAdapterWrapper.getItem(i));
+                mObservedObjects.put(i, mListAdapterWrapper.getItem(i));
 
             mListAdapterWrapper.notifyDataSetInvalidated();
         }
@@ -105,8 +113,6 @@ public class SwipeableListView extends ListView implements SwipeableViewDelegate
             mWrappedView = wrappedView;
             mSwipeableDelegate = new SwipeableViewDelegate(this);
             mSwipeableDelegate.setOnSwipeListener(SwipeableListView.this);
-
-            mWrapperHashMap.put(mWrappedView, this);
 
             addView(wrappedView);
         }
@@ -150,16 +156,20 @@ public class SwipeableListView extends ListView implements SwipeableViewDelegate
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
+            SwipeableViewWrapper returnView;
             if (convertView instanceof SwipeableViewWrapper) {
                 View convertWrappedView = ((SwipeableViewWrapper) convertView).getWrappedView();
                 View fromInner = mInnerAdapter.getView(position, convertWrappedView, parent);
                 if (convertWrappedView == fromInner)
-                    return convertView;
+                    returnView = (SwipeableViewWrapper) convertView;
                 else
-                    return new SwipeableViewWrapper(parent.getContext(), fromInner);
-            }
-            return new SwipeableViewWrapper(parent.getContext(),
+                    returnView = new SwipeableViewWrapper(parent.getContext(), fromInner);
+            } else
+                returnView = new SwipeableViewWrapper(parent.getContext(),
                     mInnerAdapter.getView(position, convertView, parent));
+
+            mWrapperHashMap.put(returnView, position);
+            return returnView;
         }
     }
 }
